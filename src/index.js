@@ -33,7 +33,12 @@ const app = express();
 const server = http.createServer(app);
 
 // Update this line to allow multiple origins
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', process.env.CLIENT_URL].filter(Boolean);
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://voynich-client-8sy7.vercel.app', // Add your Vercel deployment URL
+  process.env.CLIENT_URL
+].filter(Boolean);
 
 const io = socketIo(server, {
   cors: {
