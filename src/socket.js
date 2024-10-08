@@ -1,4 +1,3 @@
-const { encryptMessage, decryptMessage } = require('./utils/encryption');
 const { addMessage } = require('./controllers/chatController');
 
 function setupSocketIO(io) {
@@ -6,6 +5,7 @@ function setupSocketIO(io) {
     console.log('New client connected:', socket.id);
 
     socket.on('join', (chatId) => {
+      console.log(`${socket.id} joined chat: ${chatId}`);
       socket.join(chatId);
       console.log(`Client ${socket.id} joined chat: ${chatId}`);
     });
@@ -14,7 +14,7 @@ function setupSocketIO(io) {
       console.log(`Received message from ${sender} in chat ${chatId}:`, content);
       try {
         const newMessage = await addMessage(chatId, sender, content);
-        console.log('New message added:', newMessage);
+        console.log('New message added to database:', newMessage);
         io.to(chatId).emit('message', newMessage);
       } catch (error) {
         console.error('Error sending message:', error);

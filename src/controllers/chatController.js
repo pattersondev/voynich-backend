@@ -74,9 +74,10 @@ async function addMessage(chatId, sender, content) {
     );
     const newMessage = result.rows[0];
     newMessage.content = decryptMessage(newMessage.content);
+    console.log('Message added to database:', newMessage);
     return newMessage;
   } catch (err) {
-    console.error('Error adding message:', err);
+    console.error('Error adding message to database:', err);
     throw err;
   } finally {
     client.release();
