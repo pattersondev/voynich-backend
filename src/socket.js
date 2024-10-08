@@ -7,40 +7,24 @@ function setupSocketIO(io) {
   io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
-    socket.on('join', async (chatId) => {
-      console.log(`${socket.id} joined chat: ${chatId}`);
+    socket.on('join', async ({ chatId, userId }) => {
+      console.log(`${socket.id} (${userId}) joined chat: ${chatId}`);
       socket.join(chatId);
       
       if (!chatRooms.has(chatId)) {
-        chatRooms.set(chatId, new Set());
+        chatRooms.set(chatId, new Map());
       }
-      chatRooms.get(chatId).add(socket.id);
+      chatRooms.get(chatId).set(socket.id, userId);
 
-      // Check if chat has expired
-      const client = await pool.connect();
-      try {
-        const result = await client.query('SELECT expires_at FROM chats WHERE id = $1', [chatId]);
-        if (result.rows.length > 0) {
-          const expiresAt = new Date(result.rows[0].expires_at);
-          if (expiresAt < new Date()) {
-            io.to(chatId).emit('chatExpired');
-            chatRooms.delete(chatId);
-          }
-        } else {
-          socket.emit('chatExpired');
-        }
-      } catch (err) {
-        console.error('Error checking chat expiration:', err);
-      } finally {
-        client.release();
-      }
+      // Emit the updated user count to all clients in the chat
+      io.to(chatId).emit('userCount', chatRooms.get(chatId).size);
     });
 
-    socket.on('message', async ({ chatId, sender, content }) => {
+    socket.on('message', async ({ chatId, sender, content, attachment }) => {
       console.log(`Received message from ${sender} in chat ${chatId}:`, content);
+      console.log('Attachment:', attachment);
       try {
-        const newMessage = await addMessage(chatId, sender, content);
-        console.log('New message added to database:', newMessage);
+        const newMessage = await addMessage(chatId, sender, content, attachment);
         io.to(chatId).emit('message', newMessage);
       } catch (error) {
         console.error('Error sending message:', error);
@@ -50,36 +34,20 @@ function setupSocketIO(io) {
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
-      for (const [chatId, clients] of chatRooms) {
-        if (clients.has(socket.id)) {
-          clients.delete(socket.id);
-          if (clients.size === 0) {
+      for (const [chatId, users] of chatRooms) {
+        if (users.has(socket.id)) {
+          users.delete(socket.id);
+          if (users.size === 0) {
             chatRooms.delete(chatId);
+          } else {
+            // Emit the updated user count to all clients in the chat
+            io.to(chatId).emit('userCount', users.size);
           }
           break;
         }
       }
     });
   });
-
-  // Periodically check for expired chats
-  setInterval(async () => {
-    const client = await pool.connect();
-    try {
-      const result = await client.query('SELECT id FROM chats WHERE expires_at < NOW()');
-      for (const row of result.rows) {
-        const chatId = row.id;
-        if (chatRooms.has(chatId)) {
-          io.to(chatId).emit('chatExpired');
-          chatRooms.delete(chatId);
-        }
-      }
-    } catch (err) {
-      console.error('Error checking for expired chats:', err);
-    } finally {
-      client.release();
-    }
-  }, 60000); // Check every minute
 }
 
 module.exports = { setupSocketIO };

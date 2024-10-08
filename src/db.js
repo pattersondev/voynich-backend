@@ -23,8 +23,12 @@ async function setupDatabase() {
         chat_id VARCHAR(32) REFERENCES chats(id) ON DELETE CASCADE,
         sender VARCHAR(255) NOT NULL,
         content TEXT NOT NULL,
+        attachment JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+      CREATE INDEX IF NOT EXISTS idx_chats_expires_at ON chats(expires_at);
     `);
     console.log('Database setup complete');
   } catch (err) {

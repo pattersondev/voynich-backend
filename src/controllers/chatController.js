@@ -63,17 +63,41 @@ async function getChat(req, res) {
   }
 }
 
-async function addMessage(chatId, sender, content) {
+async function addMessage(chatId, sender, content, attachment) {
   const client = await pool.connect();
 
   try {
+    let encryptedAttachment = null;
+    if (attachment) {
+      encryptedAttachment = {
+        name: encryptMessage(attachment.name),
+        type: encryptMessage(attachment.type),
+        data: encryptMessage(attachment.data),
+      };
+    }
+
     const encryptedContent = encryptMessage(content);
     const result = await client.query(
-      'INSERT INTO messages (chat_id, sender, content) VALUES ($1, $2, $3) RETURNING id, sender, content, created_at',
-      [chatId, sender, encryptedContent]
+      'INSERT INTO messages (chat_id, sender, content, attachment) VALUES ($1, $2, $3, $4) RETURNING id, sender, content, attachment, created_at',
+      [chatId, sender, encryptedContent, encryptedAttachment ? JSON.stringify(encryptedAttachment) : null]
     );
+    
     const newMessage = result.rows[0];
     newMessage.content = decryptMessage(newMessage.content);
+    
+    if (newMessage.attachment) {
+      // Check if attachment is a string (JSON) or already an object
+      const attachmentObj = typeof newMessage.attachment === 'string' 
+        ? JSON.parse(newMessage.attachment) 
+        : newMessage.attachment;
+      
+      newMessage.attachment = {
+        name: decryptMessage(attachmentObj.name),
+        type: decryptMessage(attachmentObj.type),
+        data: decryptMessage(attachmentObj.data),
+      };
+    }
+
     console.log('Message added to database:', newMessage);
     return newMessage;
   } catch (err) {
@@ -84,4 +108,36 @@ async function addMessage(chatId, sender, content) {
   }
 }
 
-module.exports = { createChat, getChat, addMessage };
+async function addAttachment(chatId, sender, attachment) {
+  const client = await pool.connect();
+
+  try {
+    const encryptedAttachment = {
+      name: encryptMessage(attachment.name),
+      type: encryptMessage(attachment.type),
+      data: encryptMessage(attachment.data),
+    };
+
+    const result = await client.query(
+      'INSERT INTO messages (chat_id, sender, attachment) VALUES ($1, $2, $3) RETURNING id, sender, attachment, created_at',
+      [chatId, sender, JSON.stringify(encryptedAttachment)]
+    );
+    
+    const newAttachment = result.rows[0];
+    newAttachment.attachment = {
+      name: decryptMessage(JSON.parse(newAttachment.attachment).name),
+      type: decryptMessage(JSON.parse(newAttachment.attachment).type),
+      data: decryptMessage(JSON.parse(newAttachment.attachment).data),
+    };
+
+    console.log('Attachment added to database:', newAttachment);
+    return newAttachment;
+  } catch (err) {
+    console.error('Error adding attachment to database:', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { createChat, getChat, addMessage, addAttachment };
