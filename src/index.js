@@ -36,7 +36,9 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://voynich-client-8sy7.vercel.app', // Add your Vercel deployment URL
+  'https://voynich-client-8sy7.vercel.app',
+  'https://voynich.chat',
+  'https://www.voynich.chat',
   process.env.CLIENT_URL
 ].filter(Boolean);
 
@@ -82,7 +84,7 @@ app.use('/api', routes);
 setupDatabase();
 
 // Run cleanup every hour
-setInterval(cleanupExpiredChats, 60 * 60 * 1000);
+setInterval(cleanupExpiredChats, 60000);
 
 const PORT = process.env.PORT || 3005;
 
